@@ -1,10 +1,6 @@
 export default function handler(req, res) {
-  // This is a serverless function to inject the security string
-  // It serves the index.html with the security string injected
-  
   const securityString = process.env.SECURITY_STRING || '__SECURITY_STRING__';
   
-  // Read the HTML template and inject the security string
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -135,8 +131,7 @@ export default function handler(req, res) {
             border-radius: 8px;
             margin-bottom: 20px;
         }
-        .video-container iframe,
-        .video-container video {
+        .video-container iframe {
             position: absolute;
             top: 0;
             left: 0;
@@ -211,6 +206,16 @@ export default function handler(req, res) {
             background: #4caf50;
             color: white;
         }
+        .type-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            background: #667eea;
+            color: white;
+            margin-left: 10px;
+        }
     </style>
 </head>
 <body>
@@ -226,8 +231,8 @@ export default function handler(req, res) {
             <div class="info-box">
                 <div class="info-box-title">🛡️ Security Active</div>
                 <div class="info-box-text">
-                    This platform uses a security string to fetch videos securely. 
-                    The original video URLs from Platform A remain completely hidden.
+                    This platform securely fetches videos using encrypted URLs. 
+                    Original video sources from Platform A (YouTube, Google Drive, etc.) remain completely hidden.
                 </div>
             </div>
             
@@ -246,21 +251,28 @@ export default function handler(req, res) {
 
         <div id="loadingSection" class="loading" style="display: none;">
             <div class="spinner"></div>
-            <p>Fetching secure video...</p>
+            <p>Securely fetching video...</p>
         </div>
 
         <div id="videoSection" class="video-section">
             <div class="video-header">
-                <div class="video-title">Now Playing</div>
+                <div>
+                    <span class="video-title">Now Playing</span>
+                    <span class="type-badge" id="typeBadge">-</span>
+                </div>
                 <button class="close-btn" onclick="closeVideo()">Close</button>
             </div>
             <div class="video-container">
-                <iframe id="videoPlayer" allowfullscreen allow="autoplay"></iframe>
+                <iframe id="videoPlayer" allowfullscreen allow="autoplay; encrypted-media"></iframe>
             </div>
             <div class="video-info">
                 <div class="video-info-item">
                     <span class="video-info-label">Video ID:</span>
                     <span id="videoId">-</span>
+                </div>
+                <div class="video-info-item">
+                    <span class="video-info-label">Type:</span>
+                    <span id="videoTypeText">-</span>
                 </div>
                 <div class="video-info-item">
                     <span class="video-info-label">Status:</span>
@@ -322,12 +334,14 @@ export default function handler(req, res) {
 
                 const data = await response.json();
 
-                if (data.success && data.originalUrl) {
-                    currentVideoUrl = data.originalUrl;
+                if (data.success && data.embeddableUrl) {
+                    currentVideoUrl = data.embeddableUrl;
                     currentVideoId = data.videoId || videoId;
                     
                     videoPlayer.src = currentVideoUrl;
                     document.getElementById('videoId').textContent = currentVideoId;
+                    document.getElementById('videoTypeText').textContent = data.videoType.toUpperCase();
+                    document.getElementById('typeBadge').textContent = data.videoType.toUpperCase();
                     
                     loadingSection.style.display = 'none';
                     videoSection.classList.add('active');
