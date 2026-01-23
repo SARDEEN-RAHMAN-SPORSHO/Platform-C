@@ -415,8 +415,8 @@ export default function handler(req, res) {
         let isPlaying = false;
         let useIframe = false;
 
-        document.addEventListener('contextmenu', e => e.preventDefault());
-        document.addEventListener('keydown', e => {
+        document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+        document.addEventListener('keydown', function(e) {
             if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I') || 
                 (e.ctrlKey && e.shiftKey && e.key === 'C') || (e.ctrlKey && e.key === 'u')) {
                 e.preventDefault();
@@ -451,7 +451,7 @@ export default function handler(req, res) {
                 const urlParts = videoUrlInput.split('/');
                 const videoId = urlParts[urlParts.length - 1];
                 const baseUrl = videoUrlInput.substring(0, videoUrlInput.lastIndexOf('/video/'));
-                const apiUrl = \`\${baseUrl}/api/video/\${videoId}\`;
+                const apiUrl = baseUrl + '/api/video/' + videoId;
 
                 const response = await fetch(apiUrl, {
                     headers: { 'X-Security-String': SECURITY_STRING }
@@ -466,65 +466,42 @@ export default function handler(req, res) {
                 useIframe = data.useIframe;
 
                 if (useIframe) {
-                    // For YouTube, Vimeo, Dailymotion - use iframe
                     iframe.src = data.streamUrl;
                     iframe.style.display = 'block';
                     video.style.display = 'none';
                     document.getElementById('customControls').style.display = 'none';
+                    
+                    loadingSection.style.display = 'none';
+                    videoSection.classList.add('active');
+                    videoSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 } else {
-                    // For Dropbox, GDrive - use fast streaming with range support
-                    const proxyUrl = data.proxyUrl + '?t=' + Date.now();
+                    const proxyUrl = data.proxyUrl;
                     
-                    // Set video source directly to proxy URL for range request support
-                    const videoElement = document.createElement('video');
-                    videoElement.id = 'videoPlayer';
-                    videoElement.playsinline = true;
-                    videoElement.preload = 'metadata';
-                    videoElement.oncontextmenu = () => false;
-                    
-                    // Replace old video element
-                    video.parentNode.replaceChild(videoElement, video);
-                    video = videoElement;
-                    
-                    // Create custom fetch with security headers for HLS/streaming
-                    video.crossOrigin = 'anonymous';
-                    
-                    // Directly set the proxy URL - browser will handle range requests
-                    const streamUrl = new URL(proxyUrl);
-                    streamUrl.searchParams.set('sec', SECURITY_STRING);
-                    
-                    // Use proxy URL directly with proper headers
-                    fetch(proxyUrl, {
-                        method: 'HEAD',
-                        headers: { 'X-Security-String': SECURITY_STRING }
-                    }).then(response => {
-                        if (response.ok) {
-                            // Set source directly - browser handles range requests
-                            video.src = proxyUrl;
-                            video.load();
-                            
-                            video.addEventListener('loadedmetadata', () => {
-                                loadingSection.style.display = 'none';
-                                videoSection.classList.add('active');
-                                videoSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                            });
-                            
-                            video.addEventListener('error', (e) => {
-                                console.error('Video error:', e);
-                                loadingSection.style.display = 'none';
-                                showError('Failed to load video stream');
-                            });
-                        }
-                    });
-                    
-                    iframe.style.display = 'none';
                     video.style.display = 'block';
+                    iframe.style.display = 'none';
                     document.getElementById('customControls').style.display = 'block';
+                    
+                    video.addEventListener('loadedmetadata', function() {
+                        loadingSection.style.display = 'none';
+                        videoSection.classList.add('active');
+                        videoSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, { once: true });
+                    
+                    video.addEventListener('error', function(e) {
+                        console.error('Video error:', e);
+                        loadingSection.style.display = 'none';
+                        showError('Failed to load video. Check console for details.');
+                    }, { once: true });
+                    
+                    video.src = proxyUrl;
+                    video.load();
+                    
                     initControls();
                 }
 
                 loadBtn.disabled = false;
             } catch (error) {
+                console.error('Load error:', error);
                 loadingSection.style.display = 'none';
                 showError('Error loading video: ' + error.message);
                 loadBtn.disabled = false;
@@ -542,9 +519,6 @@ export default function handler(req, res) {
             const wrapper = document.getElementById('playerWrapper');
             const bufferIndicator = document.getElementById('bufferIndicator');
 
-            playBtn.addEventListener('click', togglePlay);
-            video.addEventListener('click', togglePlay);
-
             function togglePlay() {
                 if (video.paused) {
                     video.play();
@@ -559,19 +533,28 @@ export default function handler(req, res) {
                 }
             }
 
-            video.addEventListener('waiting', () => bufferIndicator.classList.add('show'));
-            video.addEventListener('canplay', () => bufferIndicator.classList.remove('show'));
-            video.addEventListener('playing', () => bufferIndicator.classList.remove('show'));
+            playBtn.addEventListener('click', togglePlay);
+            video.addEventListener('click', togglePlay);
 
-            video.addEventListener('timeupdate', () => {
+            video.addEventListener('waiting', function() { 
+                bufferIndicator.classList.add('show'); 
+            });
+            video.addEventListener('canplay', function() { 
+                bufferIndicator.classList.remove('show'); 
+            });
+            video.addEventListener('playing', function() { 
+                bufferIndicator.classList.remove('show'); 
+            });
+
+            video.addEventListener('timeupdate', function() {
                 if (video.duration && !isNaN(video.duration)) {
                     const percent = (video.currentTime / video.duration) * 100;
                     progressBar.style.width = percent + '%';
-                    timeDisplay.textContent = \`\${formatTime(video.currentTime)} / \${formatTime(video.duration)}\`;
+                    timeDisplay.textContent = formatTime(video.currentTime) + ' / ' + formatTime(video.duration);
                 }
             });
 
-            progressContainer.addEventListener('click', (e) => {
+            progressContainer.addEventListener('click', function(e) {
                 if (video.duration && !isNaN(video.duration)) {
                     const rect = progressContainer.getBoundingClientRect();
                     const pos = (e.clientX - rect.left) / rect.width;
@@ -579,12 +562,12 @@ export default function handler(req, res) {
                 }
             });
 
-            volumeSlider.addEventListener('input', (e) => {
+            volumeSlider.addEventListener('input', function(e) {
                 video.volume = e.target.value / 100;
                 updateVolumeIcon(e.target.value);
             });
 
-            volumeBtn.addEventListener('click', () => {
+            volumeBtn.addEventListener('click', function() {
                 if (video.volume > 0) {
                     video.volume = 0;
                     volumeSlider.value = 0;
@@ -595,25 +578,28 @@ export default function handler(req, res) {
                 updateVolumeIcon(volumeSlider.value);
             });
 
-            fullscreenBtn.addEventListener('click', () => {
+            fullscreenBtn.addEventListener('click', function() {
                 if (!document.fullscreenElement) {
-                    wrapper.requestFullscreen().catch(err => console.log(err));
+                    wrapper.requestFullscreen().catch(function(err) { 
+                        console.log('Fullscreen error:', err); 
+                    });
                 } else {
                     document.exitFullscreen();
                 }
             });
 
-            document.addEventListener('keydown', (e) => {
-                if (document.getElementById('videoSection').classList.contains('active')) {
+            document.addEventListener('keydown', function(e) {
+                const videoSectionActive = document.getElementById('videoSection').classList.contains('active');
+                if (videoSectionActive && !useIframe) {
                     if (e.code === 'Space') {
                         e.preventDefault();
                         togglePlay();
                     }
                     if (e.code === 'ArrowLeft' && video.currentTime) {
-                        video.currentTime -= 5;
+                        video.currentTime = Math.max(0, video.currentTime - 5);
                     }
                     if (e.code === 'ArrowRight' && video.currentTime && video.duration) {
-                        video.currentTime = Math.min(video.currentTime + 5, video.duration);
+                        video.currentTime = Math.min(video.duration, video.currentTime + 5);
                     }
                 }
             });
@@ -623,7 +609,7 @@ export default function handler(req, res) {
             if (isNaN(seconds) || !isFinite(seconds)) return '0:00';
             const mins = Math.floor(seconds / 60);
             const secs = Math.floor(seconds % 60);
-            return \`\${mins}:\${secs.toString().padStart(2, '0')}\`;
+            return mins + ':' + (secs < 10 ? '0' : '') + secs;
         }
 
         function updateVolumeIcon(value) {
@@ -651,7 +637,9 @@ export default function handler(req, res) {
             const errorEl = document.getElementById('error');
             errorEl.textContent = '❌ ' + message;
             errorEl.style.display = 'block';
-            setTimeout(() => errorEl.style.display = 'none', 5000);
+            setTimeout(function() { 
+                errorEl.style.display = 'none'; 
+            }, 5000);
         }
 
         function handleEnter(event) {
